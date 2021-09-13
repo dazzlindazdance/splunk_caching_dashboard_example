@@ -1,0 +1,103 @@
+<dashboard>
+  <label>Cached Results vs search on load</label>
+  <init>
+    <!--set panel_refresh_default to the refresh interval of the cached vs generate search, don't set it too short as it may cause duplicate executions of the generate search, it shoul never be shorter than the normal execution time of the generating search-->
+    <set token="panel_refresh_default">25</set>
+    <set token="panel_refresh">$panel_refresh_default$</set>
+  </init>
+  <search id="do_cached_exist">
+    <query>| rest splunk_server=local /services/search/jobs |search eai:acl.app="dashboard_example_cached_results_dashboard" search="| savedsearch internal_index_cached *" dispatchState="*"| where searchLatestTime==relative_time(now(),"-0m@m") AND searchEarliestTime
+    ==relative_time(now(),"-60m@m")|fields dispatchState,sid</query>
+    <refresh>$panel_refresh$</refresh>
+    <refreshType>delay</refreshType>
+    <done>
+      <!--<condition match="'job.resultCount'> 0 AND 'result.dispatchState'=DONE">-->
+      <condition match="'job.resultCount'&gt; 0 AND 'result.dispatchState'==&quot;DONE&quot;">
+        <set token="which_search">| loadjob [| rest splunk_server=local /services/search/jobs |search eai:acl.app="dashboard_example_cached_results_dashboard" search="| savedsearch internal_index_cached *" dispatchState="DONE"|head 1|fields  sid | return $sid]|eval state="cached"</set>
+        <set token="panel_refresh">$panel_refresh_default$</set>
+      </condition>
+      <condition match="'job.resultCount'&gt; 0 AND 'result.dispatchState'==&quot;RUNNING&quot;">
+        <set token="which_search">|stats count | eval message="Job running, please hold and results will be present in a moment..."| fields message</set>
+        <set token="panel_refresh">5</set>
+      </condition>
+      <condition>
+        <set token="which_search">| savedsearch internal_index_cached earliest=-60m@m latest=-0m@m|eval state="new"</set>
+        <set token="panel_refresh">$panel_refresh_default$</set>
+      </condition>
+    </done>
+  </search>
+  <row>
+    <panel>
+      <html>
+        <h2>Introduction</h2>
+        <p>This is an example to help users when they have a dashboard that is not used regularly so they do not want to use the savedsearch/loadjob approach to cached results, but have a dashboard that is used occassionally, but when used is often used by many users simultaneously and there is a desire to keep the search concurrency low.</p>
+        <h2>Requirements and Limitations</h2>
+        <p>
+          <ul>
+            <li>This technique requires searches be configured as saved searches, but no schedule is needed.</li>
+        <li>As we are aiming to load cached results we need to timebox the searches explicit periods, this means you need to snap the earliest and latest to a window, in this demo we snapped to @m, which means all searches will be re-ran once every minute if the dashboard is refreshed and the results on the dashboard will be accurate to the start of the minute.</li>
+        <li>This technique can only be used on dashboards without form inputs on the base searches, this is because form inputs alter the content of the search and as such it cannot be cached.  It maybe possible to add form inputs to the post processes, but this has not been tested.</li>
+        <li>This technique will not completely remove the users running the searches, it will significantly reduce them though.  This technique checks for running or completed searches before running the searches, it takes a few seconds for a search to be available to the REST call, so 2 or more users loading the dashboard at exactly the same time may cause the generating searches to be ran twice, this issue is less likely to occur the larger the snap period of a search, eg a dashboard snapping to the hour is less likely do see multiple generating searches run than a dashboard snapping the minute.</li>
+          </ul>
+        </p>
+        <h2>How it works?</h2>
+        <p>On page load there is a search that runs and checks if there are results available for the savedsearch, it then populates a variable with either the load job to give cached results of the search to generate results.
+          <pre>
+            <![CDATA[<search id="do_cached_exist">
+    <query>| rest splunk_server=local /services/search/jobs |search eai:acl.app="dashboard_example_cached_results_dashboard" search="| savedsearch internal_index_cached *" dispatchState="DONE"| where searchLatestTime==relative_time(now(),"-0m@m") AND searchEarliestTime
+    ==relative_time(now(),"-60m@m")|fields sid</query>
+    <done>
+      <condition match="'job.resultCount'> 0">
+        <set token="which_search">| loadjob [| rest splunk_server=local /services/search/jobs |search eai:acl.app="dashboard_example_cached_results_dashboard" search="| savedsearch internal_index_cached *" dispatchState="DONE"|head 1|fields  sid | return $sid]|eval state="cached"</set>
+      </condition>
+      <condition>
+        <set token="which_search">| savedsearch internal_index_cached earliest=-60m@m latest=-0m@m|eval state="new"</set>
+      </condition>
+    </done>
+  </search>]]>
+          </pre>
+        </p>
+        <p>The variable is then used in the dashboard panel as appropriate.
+        <pre>
+            <![CDATA[<table><search><query>\$which_search\$</query></search></table>]]>
+          </pre>
+        </p>
+        <p>As you refresh the dashboard you will see the value of \$which_search\$ changes:
+        <pre>$which_search$</pre>
+        </p>
+      </html>
+    </panel>
+    <panel>
+      <title>cached to minute</title>
+      <title>Search Post Process from "Cached to minute" panel</title>
+      <table>
+        <title>Table of content with flag on whether this was new or cached data</title>
+        <search id="base_search">
+          <query>$which_search$</query>
+        </search>
+      </table>
+      <chart>
+        <title>chart using search post processing to transform the table above</title>
+        <search base="base_search">
+          <query>| fields - state | convert timeformat="%m/%d/%Y %H:%M:%S.%3Q" mktime(latest_event) AS _time| bin span=5m _time | stats count by _time,sourcetype| xyseries _time,sourcetype,count</query>
+        </search>
+        <option name="charting.chart.stackMode">stacked</option>
+      </chart>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <strong>refresh currently:</strong>$panel_refresh$</html>
+    </panel>
+  </row>
+  <row>
+    <panel>
+      <html>
+        <center>
+          <img src="/static/app/dashboard_example_cached_results_dashboard/cache_flowchart.png" alt="Cached Results Flowchart"/>
+        </center>
+      </html>
+    </panel>
+  </row>
+</dashboard>
