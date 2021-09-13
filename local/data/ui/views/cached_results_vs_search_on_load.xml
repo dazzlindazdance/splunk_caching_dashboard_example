@@ -6,14 +6,14 @@
     <set token="panel_refresh">$panel_refresh_default$</set>
   </init>
   <search id="do_cached_exist">
-    <query>| rest splunk_server=local /services/search/jobs |search eai:acl.app="dashboard_example_cached_results_dashboard" search="| savedsearch internal_index_cached *" dispatchState="*"| where searchLatestTime==relative_time(now(),"-0m@m") AND searchEarliestTime
+    <query>| rest splunk_server=local /services/search/jobs |search eai:acl.app="splunk_caching_dashboard_example" search="| savedsearch internal_index_cached *" dispatchState="*"| where searchLatestTime==relative_time(now(),"-0m@m") AND searchEarliestTime
     ==relative_time(now(),"-60m@m")|fields dispatchState,sid</query>
     <refresh>$panel_refresh$</refresh>
     <refreshType>delay</refreshType>
     <done>
       <!--<condition match="'job.resultCount'> 0 AND 'result.dispatchState'=DONE">-->
       <condition match="'job.resultCount'&gt; 0 AND 'result.dispatchState'==&quot;DONE&quot;">
-        <set token="which_search">| loadjob [| rest splunk_server=local /services/search/jobs |search eai:acl.app="dashboard_example_cached_results_dashboard" search="| savedsearch internal_index_cached *" dispatchState="DONE"|head 1|fields  sid | return $sid]|eval state="cached"</set>
+        <set token="which_search">| loadjob [| rest splunk_server=local /services/search/jobs |search eai:acl.app="splunk_caching_dashboard_example" search="| savedsearch internal_index_cached *" dispatchState="DONE"|head 1|fields  sid | return $sid]|eval state="cached"</set>
         <set token="panel_refresh">$panel_refresh_default$</set>
       </condition>
       <condition match="'job.resultCount'&gt; 0 AND 'result.dispatchState'==&quot;RUNNING&quot;">
@@ -44,11 +44,11 @@
         <p>On page load there is a search that runs and checks if there are results available for the savedsearch, it then populates a variable with either the load job to give cached results of the search to generate results.
           <pre>
             <![CDATA[<search id="do_cached_exist">
-    <query>| rest splunk_server=local /services/search/jobs |search eai:acl.app="dashboard_example_cached_results_dashboard" search="| savedsearch internal_index_cached *" dispatchState="DONE"| where searchLatestTime==relative_time(now(),"-0m@m") AND searchEarliestTime
+    <query>| rest splunk_server=local /services/search/jobs |search eai:acl.app="splunk_caching_dashboard_example" search="| savedsearch internal_index_cached *" dispatchState="DONE"| where searchLatestTime==relative_time(now(),"-0m@m") AND searchEarliestTime
     ==relative_time(now(),"-60m@m")|fields sid</query>
     <done>
       <condition match="'job.resultCount'> 0">
-        <set token="which_search">| loadjob [| rest splunk_server=local /services/search/jobs |search eai:acl.app="dashboard_example_cached_results_dashboard" search="| savedsearch internal_index_cached *" dispatchState="DONE"|head 1|fields  sid | return $sid]|eval state="cached"</set>
+        <set token="which_search">| loadjob [| rest splunk_server=local /services/search/jobs |search eai:acl.app="splunk_caching_dashboard_example" search="| savedsearch internal_index_cached *" dispatchState="DONE"|head 1|fields  sid | return $sid]|eval state="cached"</set>
       </condition>
       <condition>
         <set token="which_search">| savedsearch internal_index_cached earliest=-60m@m latest=-0m@m|eval state="new"</set>
@@ -95,7 +95,7 @@
     <panel>
       <html>
         <center>
-          <img src="/static/app/dashboard_example_cached_results_dashboard/cache_flowchart.png" alt="Cached Results Flowchart"/>
+          <img src="/static/app/splunk_caching_dashboard_example/cache_flowchart.png" alt="Cached Results Flowchart"/>
         </center>
       </html>
     </panel>
