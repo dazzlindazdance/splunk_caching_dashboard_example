@@ -68,8 +68,6 @@
       </html>
     </panel>
     <panel>
-      <title>cached to minute</title>
-      <title>Search Post Process from "Cached to minute" panel</title>
       <table>
         <title>Table of content with flag on whether this was new or cached data</title>
         <search id="base_search">
